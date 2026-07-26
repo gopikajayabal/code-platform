@@ -7,8 +7,8 @@ type Problem = {
   id: string;
   title: string;
   slug: string;
-  language: string;
-  topic: string;
+  language?: string;
+  topic?: string;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   solvedCount: number;
   totalCount: number;
@@ -21,15 +21,42 @@ export default function ProblemsPage() {
   const [topic, setTopic] = useState("ALL");
   const [difficulty, setDifficulty] = useState("ALL");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function loadProblems() {
       try {
-        const res = await fetch("http://localhost:5000/api/problems");
-        const data = await res.json();
-        setProblems(data.problems || []);
-      } catch {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch("http://localhost:5000/api/problems", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load problems");
+        }
+
+        const data = await response.json();
+
+        const normalizedProblems: Problem[] = (
+          Array.isArray(data) ? data : data.problems || []
+        ).map((problem: Problem) => ({
+          ...problem,
+          language: problem.language?.trim() || "GENERAL",
+          topic: problem.topic?.trim() || "General",
+          solvedCount: Number(problem.solvedCount || 0),
+          totalCount: Number(problem.totalCount || 0),
+        }));
+
+        setProblems(normalizedProblems);
+      } catch (err) {
         setProblems([]);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not connect to backend."
+        );
       } finally {
         setLoading(false);
       }
@@ -38,14 +65,31 @@ export default function ProblemsPage() {
     loadProblems();
   }, []);
 
+  const languages = useMemo(() => {
+    return Array.from(
+      new Set(
+        problems.map((problem) =>
+          (problem.language || "GENERAL").toUpperCase()
+        )
+      )
+    ).sort();
+  }, [problems]);
+
   const topics = useMemo(() => {
     const languageProblems =
       language === "ALL"
         ? problems
-        : problems.filter((problem) => problem.language === language);
+        : problems.filter(
+            (problem) =>
+              (problem.language || "GENERAL").toUpperCase() === language
+          );
 
     return Array.from(
-      new Set(languageProblems.map((problem) => problem.topic || "General"))
+      new Set(
+        languageProblems.map(
+          (problem) => problem.topic?.trim() || "General"
+        )
+      )
     ).sort();
   }, [language, problems]);
 
@@ -53,33 +97,42 @@ export default function ProblemsPage() {
     setTopic("ALL");
   }, [language]);
 
-  const filteredProblems = problems.filter((problem) => {
-    const matchesSearch = problem.title
-      .toLowerCase()
-      .includes(search.toLowerCase());
+  const filteredProblems = useMemo(() => {
+    return problems.filter((problem) => {
+      const problemLanguage = (
+        problem.language || "GENERAL"
+      ).toUpperCase();
 
-    const matchesLanguage =
-      language === "ALL" || problem.language === language;
+      const problemTopic = problem.topic?.trim() || "General";
 
-    const matchesTopic =
-      topic === "ALL" || (problem.topic || "General") === topic;
+      const matchesSearch = problem.title
+        .toLowerCase()
+        .includes(search.toLowerCase().trim());
 
-    const matchesDifficulty =
-      difficulty === "ALL" || problem.difficulty === difficulty;
+      const matchesLanguage =
+        language === "ALL" || problemLanguage === language;
 
-    return (
-      matchesSearch &&
-      matchesLanguage &&
-      matchesTopic &&
-      matchesDifficulty
-    );
-  });
+      const matchesTopic =
+        topic === "ALL" || problemTopic === topic;
 
-  const getDifficultyColor = (value: string) => {
+      const matchesDifficulty =
+        difficulty === "ALL" ||
+        problem.difficulty === difficulty;
+
+      return (
+        matchesSearch &&
+        matchesLanguage &&
+        matchesTopic &&
+        matchesDifficulty
+      );
+    });
+  }, [problems, search, language, topic, difficulty]);
+
+  function getDifficultyColor(value: string) {
     if (value === "EASY") return "#22c55e";
     if (value === "MEDIUM") return "#f59e0b";
     return "#ef4444";
-  };
+  }
 
   return (
     <main
@@ -95,8 +148,22 @@ export default function ProblemsPage() {
       </h1>
 
       <p style={{ color: "#94a3b8", marginBottom: "20px" }}>
-        {filteredProblems.length} problems found
+        {loading
+          ? "Loading problems..."
+          : `${filteredProblems.length} problems found`}
       </p>
+
+      {error && (
+        <p
+          style={{
+            color: "#ef4444",
+            marginBottom: "20px",
+            fontWeight: "bold",
+          }}
+        >
+          {error}
+        </p>
+      )}
 
       <div
         style={{
@@ -109,27 +176,27 @@ export default function ProblemsPage() {
         <input
           placeholder="Search problems..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(event) => setSearch(event.target.value)}
           style={inputStyle}
         />
 
         <select
           value={language}
-          onChange={(e) => setLanguage(e.target.value)}
+          onChange={(event) => setLanguage(event.target.value)}
           style={inputStyle}
         >
           <option value="ALL">All Languages</option>
-          <option value="C">C</option>
-          <option value="C++">C++</option>
-          <option value="Java">Java</option>
-          <option value="Python">Python</option>
-          <option value="HTML">HTML</option>
-          <option value="GENERAL">General</option>
+
+          {languages.map((languageName) => (
+            <option key={languageName} value={languageName}>
+              {languageName}
+            </option>
+          ))}
         </select>
 
         <select
           value={topic}
-          onChange={(e) => setTopic(e.target.value)}
+          onChange={(event) => setTopic(event.target.value)}
           style={inputStyle}
         >
           <option value="ALL">All Topics</option>
@@ -143,7 +210,7 @@ export default function ProblemsPage() {
 
         <select
           value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value)}
+          onChange={(event) => setDifficulty(event.target.value)}
           style={inputStyle}
         >
           <option value="ALL">All Difficulties</option>
@@ -160,8 +227,18 @@ export default function ProblemsPage() {
           overflow: "hidden",
         }}
       >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead style={{ background: "#0f172a", color: "#94a3b8" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+          }}
+        >
+          <thead
+            style={{
+              background: "#0f172a",
+              color: "#94a3b8",
+            }}
+          >
             <tr>
               <th style={thStyle}>Title</th>
               <th style={thStyle}>Language</th>
@@ -189,7 +266,8 @@ export default function ProblemsPage() {
                 const acceptance =
                   problem.totalCount > 0
                     ? (
-                        (problem.solvedCount / problem.totalCount) *
+                        (problem.solvedCount /
+                          problem.totalCount) *
                         100
                       ).toFixed(1)
                     : "0.0";
@@ -197,7 +275,9 @@ export default function ProblemsPage() {
                 return (
                   <tr
                     key={problem.id}
-                    style={{ borderTop: "1px solid #334155" }}
+                    style={{
+                      borderTop: "1px solid #334155",
+                    }}
                   >
                     <td style={{ padding: "14px" }}>
                       <Link
@@ -212,18 +292,30 @@ export default function ProblemsPage() {
                       </Link>
                     </td>
 
-                    <td style={{ padding: "14px", color: "#cbd5e1" }}>
-                      {problem.language || "GENERAL"}
+                    <td
+                      style={{
+                        padding: "14px",
+                        color: "#cbd5e1",
+                      }}
+                    >
+                      {(problem.language || "GENERAL").toUpperCase()}
                     </td>
 
-                    <td style={{ padding: "14px", color: "#cbd5e1" }}>
+                    <td
+                      style={{
+                        padding: "14px",
+                        color: "#cbd5e1",
+                      }}
+                    >
                       {problem.topic || "General"}
                     </td>
 
                     <td style={{ padding: "14px" }}>
                       <span
                         style={{
-                          color: getDifficultyColor(problem.difficulty),
+                          color: getDifficultyColor(
+                            problem.difficulty
+                          ),
                           fontWeight: "bold",
                         }}
                       >
@@ -231,7 +323,12 @@ export default function ProblemsPage() {
                       </span>
                     </td>
 
-                    <td style={{ padding: "14px", color: "#cbd5e1" }}>
+                    <td
+                      style={{
+                        padding: "14px",
+                        color: "#cbd5e1",
+                      }}
+                    >
                       {acceptance}%
                     </td>
                   </tr>
