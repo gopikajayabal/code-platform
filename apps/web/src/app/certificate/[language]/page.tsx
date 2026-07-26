@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use,useEffect, useState } from "react";
 import Link from "next/link";
 
 type LanguageProgress = {
@@ -19,7 +19,8 @@ export default function CertificatePage({
   const [progress, setProgress] = useState<LanguageProgress | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const language = decodeURIComponent(params.language);
+  const { language: languageParam } = use(params);
+const language = decodeURIComponent(languageParam);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
