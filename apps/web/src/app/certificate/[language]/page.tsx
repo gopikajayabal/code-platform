@@ -13,7 +13,7 @@ type LanguageProgress = {
 export default function CertificatePage({
   params,
 }: {
-  params: { language: string };
+  params: Promise<{ language: string }>;
 }) {
   const [username, setUsername] = useState("Learner");
   const [progress, setProgress] = useState<LanguageProgress | null>(null);

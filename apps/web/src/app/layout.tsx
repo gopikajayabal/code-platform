@@ -29,7 +29,7 @@ export default function RootLayout({
               fontWeight: "bold",
             }}
           >
-            Code Platform
+            CodeGO
           </Link>
 
           <div
