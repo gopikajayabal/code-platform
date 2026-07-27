@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 
 type LeaderboardUser = {
   rank: number;
@@ -10,29 +11,42 @@ type LeaderboardUser = {
   submissions: number;
 };
 
-export default function PublicProfilePage({
-  params,
-}: {
-  params: { username: string };
-}) {
-  const [user, setUser] = useState<LeaderboardUser | null>(null);
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5000";
+
+export default function PublicProfilePage() {
+  const params = useParams<{ username: string }>();
+
+  const [user, setUser] =
+    useState<LeaderboardUser | null>(null);
+
   const [loading, setLoading] = useState(true);
-  const username = decodeURIComponent(params.username);
+
+  const username = decodeURIComponent(
+    params.username
+  );
 
   useEffect(() => {
     async function loadProfile() {
       try {
         const res = await fetch(
-          "http://localhost:5000/api/submissions/leaderboard"
+          `${API_URL}/api/submissions/leaderboard`
         );
+
         const data = await res.json();
 
         if (data.success) {
           const found = data.leaderboard.find(
-            (item: LeaderboardUser) => item.username === username
+            (item: LeaderboardUser) =>
+              item.username === username
           );
+
           setUser(found || null);
         }
+      } catch (error) {
+        console.error("Profile loading failed:", error);
+        setUser(null);
       } finally {
         setLoading(false);
       }
@@ -42,12 +56,19 @@ export default function PublicProfilePage({
   }, [username]);
 
   function copyLink() {
-    navigator.clipboard.writeText(window.location.href);
+    navigator.clipboard.writeText(
+      window.location.href
+    );
+
     alert("Profile link copied!");
   }
 
   if (loading) {
-    return <main style={pageStyle}>Loading profile...</main>;
+    return (
+      <main style={pageStyle}>
+        Loading profile...
+      </main>
+    );
   }
 
   if (!user) {
@@ -68,10 +89,19 @@ export default function PublicProfilePage({
         </p>
 
         <h2>Rank #{user.rank}</h2>
-        <p>Solved Problems: {user.solved}</p>
-        <p>Total Submissions: {user.submissions}</p>
 
-        <button onClick={copyLink} style={buttonStyle}>
+        <p>
+          Solved Problems: {user.solved}
+        </p>
+
+        <p>
+          Total Submissions: {user.submissions}
+        </p>
+
+        <button
+          onClick={copyLink}
+          style={buttonStyle}
+        >
           Copy Share Link
         </button>
       </div>
